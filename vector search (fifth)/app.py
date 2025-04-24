@@ -37,7 +37,7 @@ def build_query_vector(query: str, idf: dict[str, float]) -> tuple[dict[str, flo
             tf = cnt / total
             q_vec[term] = tf * idf[term]
 
-    norm = math.sqrt(sum(v * v for v in q_vec.values()))
+    norm = math.sqrt(sum(v * v for v in q_vec.values()))  # квадратный корень из суммы квадратов всех tf-idf вектора
     return q_vec, norm
 
 
@@ -48,7 +48,7 @@ def load_corpus():
     2. Для каждого файла:
         2.1. Извлекаем номер страницы из имени
         2.2. Читаем файл и собираем словарь "термин: tf‑idf"
-        2.3. Пополняем глобальный словарь idf.
+        2.3. Пополняем глобальный словарь idf
         2.4. Вычисляем L2‑норму вектора (сумма tf‑idf^2)
     3. На выходе возвращаем четыре словаря:
         doc_vecs "page: {term: tf‑idf}"
@@ -108,12 +108,12 @@ def search(query: str, k: int = 10) -> list[tuple[str, float]]:
     scores: list[tuple[str, float]] = []
     for doc, d_vec in DOC_VECS.items():
         dot = 0.0
-        for term, q_w in q_vec.items():
+        for term, q_w in q_vec.items():  # q_w - tf-idf вектора запроса
             d_w = d_vec.get(term) # d_w - tf-idf вектора документа
             if d_w is not None:
                 dot += q_w * d_w  # скалярное произведение tf-idf векторов
         if dot > 0:
-            sim = dot / (q_norm * DOC_NORMS[doc])  # делим на вектора документа умноженный на вектор запроса
+            sim = dot / (q_norm * DOC_NORMS[doc])  # делим на норму вектора документа умноженную на норму вектора запроса
             scores.append((doc, sim))
 
     scores.sort(key=lambda x: x[1], reverse=True)
