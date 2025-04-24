@@ -16,6 +16,15 @@ def tokenize(text: str) -> list[str]:
 
 
 def build_query_vector(query: str, idf: dict[str, float]) -> tuple[dict[str, float], float]:
+    """
+    1. Делим строку на отдельные слова
+    2. Считаем сколько раз каждое слово встретилось в запросе
+    3. Проходимся по каждому слову:
+       3.1. Если слова нет в idf, то пропускаем (потому что его нет в корпусе)
+       3.2. Считаем tf (количество вхождений слова в запросе / общее количество слов в запросе)
+       3.3. Считаем tf-idf (tf * idf) 
+    4. Считаем норму вектора (квадратный корень из суммы квадратов tf-idf)
+    """
     tokens = tokenize(query)
     if not tokens:
         return {}, 0.0
@@ -34,6 +43,19 @@ def build_query_vector(query: str, idf: dict[str, float]) -> tuple[dict[str, flo
 
 @st.cache_data(show_spinner=False)
 def load_corpus():
+    """
+    1. Перебираем все tf‑idf‑файлы
+    2. Для каждого файла:
+        2.1. Извлекаем номер страницы из имени
+        2.2. Читаем файл и собираем словарь "термин: tf‑idf"
+        2.3. Пополняем глобальный словарь idf.
+        2.4. Вычисляем L2‑норму вектора (сумма tf‑idf^2)
+    3. На выходе возвращаем четыре словаря:
+        doc_vecs "page: {term: tf‑idf}"
+        doc_norms: "page: L2‑норма вектора"
+        idf: "term: IDF" (общий для корпуса)
+        titles: "page: title" (для отображения в результатах поиска)
+    """
     doc_vecs: dict[str, dict[str, float]] = {}
     doc_norms: dict[str, float] = {}
     idf: dict[str, float] = {}
@@ -71,6 +93,14 @@ def load_corpus():
 
 
 def search(query: str, k: int = 10) -> list[tuple[str, float]]:
+    """
+    1. Получаем вектор запроса и его норму
+    2. Если норма равна нулю, значит все слова отсутствуют в корпусе
+    3. Проходимся по всем документам:
+        3.1. Берем только те слова, которые встречаются и в запросе, и в корпусе
+        3.2. Считаем скалярное произведение векторов запроса и документа
+        3.3. Если скалярное произведение больше нуля, то считаем косинусное сходство
+    """
     q_vec, q_norm = build_query_vector(query, IDF)
     if q_norm == 0:
         return []
@@ -79,11 +109,11 @@ def search(query: str, k: int = 10) -> list[tuple[str, float]]:
     for doc, d_vec in DOC_VECS.items():
         dot = 0.0
         for term, q_w in q_vec.items():
-            d_w = d_vec.get(term)
+            d_w = d_vec.get(term) # d_w - tf-idf вектора документа
             if d_w is not None:
-                dot += q_w * d_w
+                dot += q_w * d_w  # скалярное произведение tf-idf векторов
         if dot > 0:
-            sim = dot / (q_norm * DOC_NORMS[doc])
+            sim = dot / (q_norm * DOC_NORMS[doc])  # делим на вектора документа умноженный на вектор запроса
             scores.append((doc, sim))
 
     scores.sort(key=lambda x: x[1], reverse=True)
